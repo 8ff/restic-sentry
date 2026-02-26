@@ -1,0 +1,6 @@
+restic-sentry
+restic-sentry.exe
+restic-sentry.json
+restic-sentry.lock
+*.log
+.claude/
