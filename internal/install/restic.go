@@ -74,7 +74,7 @@ func extractResticFromZip(zipData []byte, destPath string) error {
 	}
 
 	for _, f := range reader.File {
-		if strings.HasSuffix(strings.ToLower(f.Name), "restic.exe") {
+		if strings.HasSuffix(strings.ToLower(f.Name), ".exe") {
 			rc, err := f.Open()
 			if err != nil {
 				return fmt.Errorf("opening %s in zip: %w", f.Name, err)
