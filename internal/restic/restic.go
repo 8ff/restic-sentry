@@ -48,17 +48,26 @@ func (r *Runner) formatEnv(redact bool) string {
 		"AWS_SECRET_ACCESS_KEY": true,
 	}
 
-	var parts []string
+	// Deduplicate: last value wins (config values are appended after os.Environ)
+	wanted := []string{"RESTIC_REPOSITORY", "RESTIC_PASSWORD", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"}
+	vals := make(map[string]string)
 	for _, pair := range r.cfg.ResticEnv() {
 		key, val, ok := strings.Cut(pair, "=")
 		if !ok {
 			continue
 		}
-		// Only include restic/AWS vars, not the entire inherited env
-		switch key {
-		case "RESTIC_REPOSITORY", "RESTIC_PASSWORD",
-			"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION":
-		default:
+		for _, w := range wanted {
+			if key == w {
+				vals[key] = val
+				break
+			}
+		}
+	}
+
+	var parts []string
+	for _, key := range wanted {
+		val, ok := vals[key]
+		if !ok {
 			continue
 		}
 		if redact && secretKeys[key] {
