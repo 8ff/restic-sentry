@@ -110,8 +110,10 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 
 	// Notify
 	if backupResult.ExitCode == restic.ExitPartial {
+		skipped := extractErrors(backupResult.Stderr, 20)
+		extra := fmt.Sprintf("*%d files skipped:*\n```\n%s\n```", countErrors(backupResult.Stderr), skipped)
 		o.notifyWarning("Backup Completed with Warnings",
-			formatSummary(backupResult, duration, "Some files were skipped (locked or permission denied). Check logs for details."))
+			formatSummary(backupResult, duration, extra))
 	} else {
 		o.notifySuccess("Backup Successful",
 			formatSummary(backupResult, duration, ""))
@@ -225,6 +227,37 @@ func formatSummary(result *restic.Result, duration time.Duration, extra string) 
 	}
 
 	return sb.String()
+}
+
+// extractErrors pulls error/warning lines from restic stderr output.
+// Each line includes the file path and reason (e.g. "Access is denied", "locked").
+// Returns up to maxLines lines to keep Slack messages reasonable.
+func extractErrors(stderr string, maxLines int) string {
+	var errors []string
+	for _, line := range strings.Split(stderr, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "error:") || strings.HasPrefix(line, "warning:") {
+			errors = append(errors, line)
+		}
+	}
+	total := len(errors)
+	if total > maxLines {
+		errors = errors[:maxLines]
+		errors = append(errors, fmt.Sprintf("... and %d more", total-maxLines))
+	}
+	return strings.Join(errors, "\n")
+}
+
+// countErrors returns the total number of error/warning lines in restic stderr.
+func countErrors(stderr string) int {
+	count := 0
+	for _, line := range strings.Split(stderr, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "error:") || strings.HasPrefix(line, "warning:") {
+			count++
+		}
+	}
+	return count
 }
 
 func truncate(s string, maxLen int) string {
