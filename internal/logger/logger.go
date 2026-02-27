@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -39,16 +40,17 @@ func (l *Logger) log(level Level, msg string, fields map[string]any) {
 		Fields:  fields,
 	}
 
-	data, err := json.Marshal(entry)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(entry); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to marshal log entry: %v\n", err)
 		return
 	}
-	data = append(data, '\n')
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	os.Stderr.Write(data)
+	os.Stderr.Write(buf.Bytes())
 }
 
 func (l *Logger) Info(msg string, fields ...map[string]any) {
