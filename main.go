@@ -187,14 +187,14 @@ func printUsage() {
 	fmt.Printf(`restic-sentry %s — Reliable Windows backup manager using restic
 
 Usage:
-  restic-sentry <command> [--config path]
+  restic-sentry <command> [flags]
 
 Commands:
-  backup       Run a full backup (preflight, backup, verify, prune, notify)
-  check        Run a full integrity check with data verification
-  status       Show snapshots, repo stats, and scheduler status
-  install      Register in Windows Task Scheduler (run as admin)
-  uninstall    Remove from Windows Task Scheduler
+  backup          Run a full backup (preflight, backup, verify, prune, notify)
+  check           Run a full integrity check with data verification
+  status          Show snapshots, repo stats, and scheduler status
+  install         Register in Windows Task Scheduler (run as admin)
+  uninstall       Remove from Windows Task Scheduler
   init-config     Generate an example config file
   install-restic  Download and install latest restic to C:\restic
   update          Self-update to the latest restic-sentry release
@@ -203,9 +203,12 @@ Commands:
 Flags:
   --config     Path to config JSON file (default: restic-sentry.json next to binary)
 
-Example:
-  restic-sentry init-config                  # create example config
-  restic-sentry backup --config backup.json  # run backup now
-  restic-sentry install --config backup.json # schedule automatic backups
+Examples:
+  restic-sentry install-restic                     # download restic
+  restic-sentry init-config                        # create example config
+  restic-sentry backup                             # run backup (uses default config path)
+  restic-sentry backup --config C:\mybackup.json   # run backup with specific config
+  restic-sentry install                            # schedule automatic backups
+  restic-sentry update                             # self-update to latest version
 `, version)
 }
