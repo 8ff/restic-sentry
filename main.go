@@ -53,6 +53,12 @@ func main() {
 			os.Exit(1)
 		}
 		return
+	case "update":
+		if err := install.SelfUpdate(version); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	// All other commands need a config file
@@ -191,6 +197,7 @@ Commands:
   uninstall    Remove from Windows Task Scheduler
   init-config     Generate an example config file
   install-restic  Download and install latest restic to C:\restic
+  update          Self-update to the latest restic-sentry release
   version         Print version
 
 Flags:
