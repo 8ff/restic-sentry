@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,14 +14,14 @@ func TestLoadValidConfig(t *testing.T) {
 
 	content := `{
 		"s3": {
-			"bucket": "my-backups",
-			"access_key": "AKIA1234",
-			"secret_key": "secret1234",
+			"bucket": "real-bucket",
+			"access_key": "AKIAREAL1234",
+			"secret_key": "realSecretKey1234",
 			"region": "us-east-1"
 		},
-		"restic_password": "testpass",
+		"restic_password": "real-strong-password",
 		"paths": ["C:\\Users\\Me\\Documents"],
-		"slack_webhook_url": "https://hooks.slack.com/services/T/B/X",
+		"slack_webhook_url": "https://hooks.slack.com/services/T123/B456/realwebhook",
 		"schedule_interval_hours": 4
 	}`
 
@@ -33,8 +34,8 @@ func TestLoadValidConfig(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if cfg.S3.Bucket != "my-backups" {
-		t.Errorf("bucket = %q, want %q", cfg.S3.Bucket, "my-backups")
+	if cfg.S3.Bucket != "real-bucket" {
+		t.Errorf("bucket = %q, want %q", cfg.S3.Bucket, "real-bucket")
 	}
 	if cfg.ScheduleIntervalHours != 4 {
 		t.Errorf("schedule = %d, want 4", cfg.ScheduleIntervalHours)
@@ -95,6 +96,22 @@ func TestLoadMissingFields(t *testing.T) {
 	}
 }
 
+func TestLoadPlaceholderValues(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	// Use the example config directly — should be rejected
+	WriteExample(path)
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for unedited example config")
+	}
+	if !strings.Contains(err.Error(), "still has the example value") {
+		t.Errorf("expected placeholder error, got: %v", err)
+	}
+}
+
 func TestRepoURL(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -136,12 +153,21 @@ func TestWriteExample(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := Load(path)
+	// Verify it's valid JSON with expected fields
+	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("example config should be loadable: %v", err)
+		t.Fatal(err)
+	}
+
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("example config is not valid JSON: %v", err)
 	}
 
 	if cfg.S3.Bucket == "" {
 		t.Error("example config should have a non-empty bucket")
+	}
+	if cfg.ResticPassword == "" {
+		t.Error("example config should have a non-empty restic_password")
 	}
 }

@@ -102,6 +102,15 @@ func (c *Config) applyDefaults() {
 	}
 }
 
+// Placeholder values from init-config that must be changed before use.
+var placeholders = map[string]string{
+	"s3.bucket":         "my-backups",
+	"s3.access_key":     "AKIAIOSFODNN7EXAMPLE",
+	"s3.secret_key":     "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+	"restic_password":   "change-me-to-a-strong-password",
+	"slack_webhook_url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+}
+
 func (c *Config) validate() error {
 	if c.S3.Bucket == "" {
 		return fmt.Errorf("s3.bucket is required")
@@ -126,6 +135,21 @@ func (c *Config) validate() error {
 	if c.SlackWebhookURL == "" {
 		return fmt.Errorf("slack_webhook_url is required")
 	}
+
+	// Catch unedited example config
+	checks := map[string]string{
+		"s3.bucket":         c.S3.Bucket,
+		"s3.access_key":     c.S3.AccessKey,
+		"s3.secret_key":     c.S3.SecretKey,
+		"restic_password":   c.ResticPassword,
+		"slack_webhook_url": c.SlackWebhookURL,
+	}
+	for field, value := range checks {
+		if placeholder, ok := placeholders[field]; ok && value == placeholder {
+			return fmt.Errorf("%s still has the example value — edit your config file", field)
+		}
+	}
+
 	return nil
 }
 
