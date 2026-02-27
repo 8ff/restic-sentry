@@ -38,6 +38,8 @@ func NewRunner(cfg *config.Config, log *logger.Logger) *Runner {
 }
 
 // formatEnv returns the restic env vars formatted as a copy-pasteable command prefix.
+// On Windows, outputs PowerShell syntax ($env:VAR="val"; ).
+// On Unix, outputs inline syntax (VAR=val ).
 // If redact is true, secrets are masked with ***.
 func (r *Runner) formatEnv(redact bool) string {
 	secretKeys := map[string]bool{
@@ -48,7 +50,7 @@ func (r *Runner) formatEnv(redact bool) string {
 
 	var parts []string
 	for _, pair := range r.cfg.ResticEnv() {
-		key, _, ok := strings.Cut(pair, "=")
+		key, val, ok := strings.Cut(pair, "=")
 		if !ok {
 			continue
 		}
@@ -60,10 +62,16 @@ func (r *Runner) formatEnv(redact bool) string {
 			continue
 		}
 		if redact && secretKeys[key] {
-			parts = append(parts, fmt.Sprintf("%s=***", key))
-		} else {
-			parts = append(parts, pair)
+			val = "***"
 		}
+		if runtime.GOOS == "windows" {
+			parts = append(parts, fmt.Sprintf("$env:%s=\"%s\"", key, val))
+		} else {
+			parts = append(parts, fmt.Sprintf("%s=%s", key, val))
+		}
+	}
+	if runtime.GOOS == "windows" {
+		return strings.Join(parts, "; ")
 	}
 	return strings.Join(parts, " ")
 }
@@ -96,7 +104,13 @@ func (r *Runner) run(ctx context.Context, args ...string) (*Result, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	fullCmd := fmt.Sprintf("%s %s %s", r.formatEnv(!r.Debug), r.cfg.ResticBinary, strings.Join(args, " "))
+	envStr := r.formatEnv(!r.Debug)
+	var fullCmd string
+	if runtime.GOOS == "windows" {
+		fullCmd = fmt.Sprintf("%s; %s %s", envStr, r.cfg.ResticBinary, strings.Join(args, " "))
+	} else {
+		fullCmd = fmt.Sprintf("%s %s %s", envStr, r.cfg.ResticBinary, strings.Join(args, " "))
+	}
 	r.log.Info("running restic", map[string]any{
 		"cmd": fullCmd,
 	})
