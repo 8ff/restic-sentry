@@ -38,8 +38,8 @@ func NewRunner(cfg *config.Config, log *logger.Logger) *Runner {
 }
 
 // formatEnv returns the restic env vars formatted as a copy-pasteable command prefix.
-// On Windows, outputs PowerShell syntax ($env:VAR="val"; ).
-// On Unix, outputs inline syntax (VAR=val ).
+// On Windows, outputs CMD syntax (set VAR=val &&).
+// On Unix, outputs inline syntax (VAR=val).
 // If redact is true, secrets are masked with ***.
 func (r *Runner) formatEnv(redact bool) string {
 	secretKeys := map[string]bool{
@@ -65,13 +65,13 @@ func (r *Runner) formatEnv(redact bool) string {
 			val = "***"
 		}
 		if runtime.GOOS == "windows" {
-			parts = append(parts, fmt.Sprintf("$env:%s=\"%s\"", key, val))
+			parts = append(parts, fmt.Sprintf("set %s=%s", key, val))
 		} else {
 			parts = append(parts, fmt.Sprintf("%s=%s", key, val))
 		}
 	}
 	if runtime.GOOS == "windows" {
-		return strings.Join(parts, "; ")
+		return strings.Join(parts, " && ")
 	}
 	return strings.Join(parts, " ")
 }
