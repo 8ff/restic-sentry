@@ -21,8 +21,9 @@ const (
 )
 
 type Runner struct {
-	cfg *config.Config
-	log *logger.Logger
+	cfg   *config.Config
+	log   *logger.Logger
+	Debug bool
 }
 
 type Result struct {
@@ -36,10 +37,10 @@ func NewRunner(cfg *config.Config, log *logger.Logger) *Runner {
 	return &Runner{cfg: cfg, log: log}
 }
 
-// redactedEnv returns the restic env vars with secrets masked, formatted as
-// a copy-pasteable command prefix.
-func (r *Runner) redactedEnv() string {
-	redact := map[string]bool{
+// formatEnv returns the restic env vars formatted as a copy-pasteable command prefix.
+// If redact is true, secrets are masked with ***.
+func (r *Runner) formatEnv(redact bool) string {
+	secretKeys := map[string]bool{
 		"RESTIC_PASSWORD":       true,
 		"AWS_ACCESS_KEY_ID":     true,
 		"AWS_SECRET_ACCESS_KEY": true,
@@ -58,7 +59,7 @@ func (r *Runner) redactedEnv() string {
 		default:
 			continue
 		}
-		if redact[key] {
+		if redact && secretKeys[key] {
 			parts = append(parts, fmt.Sprintf("%s=***", key))
 		} else {
 			parts = append(parts, pair)
@@ -67,9 +68,26 @@ func (r *Runner) redactedEnv() string {
 	return strings.Join(parts, " ")
 }
 
+// commandTimeout returns a reasonable timeout based on the restic subcommand.
+// Short commands (unlock, version, snapshots, stats, init) get 2 minutes.
+// Long commands (backup, check, forget) get 4 hours.
+func commandTimeout(args []string) time.Duration {
+	if len(args) > 0 {
+		switch args[0] {
+		case "backup", "check", "forget":
+			return 4 * time.Hour
+		}
+	}
+	return 2 * time.Minute
+}
+
 // run executes a restic command with the configured environment.
 func (r *Runner) run(ctx context.Context, args ...string) (*Result, error) {
 	start := time.Now()
+
+	timeout := commandTimeout(args)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	cmd := exec.CommandContext(ctx, r.cfg.ResticBinary, args...)
 	cmd.Env = r.cfg.ResticEnv()
@@ -78,7 +96,7 @@ func (r *Runner) run(ctx context.Context, args ...string) (*Result, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	fullCmd := fmt.Sprintf("%s %s %s", r.redactedEnv(), r.cfg.ResticBinary, strings.Join(args, " "))
+	fullCmd := fmt.Sprintf("%s %s %s", r.formatEnv(!r.Debug), r.cfg.ResticBinary, strings.Join(args, " "))
 	r.log.Info("running restic", map[string]any{
 		"cmd": fullCmd,
 	})

@@ -64,6 +64,7 @@ func main() {
 	// All other commands need a config file
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
 	configPath := fs.String("config", config.DefaultConfigPath(), "path to config file")
+	debug := fs.Bool("debug", false, "print full commands with credentials (for manual testing)")
 	fs.Parse(os.Args[2:])
 
 	cfg, err := config.Load(*configPath)
@@ -79,11 +80,11 @@ func main() {
 
 	switch cmd {
 	case "backup":
-		runBackup(ctx, cfg, log)
+		runBackup(ctx, cfg, log, *debug)
 	case "check":
-		runCheck(ctx, cfg, log)
+		runCheck(ctx, cfg, log, *debug)
 	case "status":
-		runStatus(ctx, cfg, log)
+		runStatus(ctx, cfg, log, *debug)
 	case "install":
 		runInstall(cfg, log, *configPath)
 	case "uninstall":
@@ -95,7 +96,13 @@ func main() {
 	}
 }
 
-func runBackup(ctx context.Context, cfg *config.Config, log *logger.Logger) {
+func newRunner(cfg *config.Config, log *logger.Logger, debug bool) *restic.Runner {
+	r := restic.NewRunner(cfg, log)
+	r.Debug = debug
+	return r
+}
+
+func runBackup(ctx context.Context, cfg *config.Config, log *logger.Logger, debug bool) {
 	// Acquire process lock — auto-clears stale locks from dead processes
 	lock, err := lockfile.New(0)
 	if err != nil {
@@ -109,14 +116,15 @@ func runBackup(ctx context.Context, cfg *config.Config, log *logger.Logger) {
 	defer lock.Release()
 
 	orch := backup.NewOrchestrator(cfg, log)
+	orch.SetDebug(debug)
 	if err := orch.Run(ctx); err != nil {
 		log.Error("backup failed", map[string]any{"error": err.Error()})
 		os.Exit(1)
 	}
 }
 
-func runCheck(ctx context.Context, cfg *config.Config, log *logger.Logger) {
-	runner := restic.NewRunner(cfg, log)
+func runCheck(ctx context.Context, cfg *config.Config, log *logger.Logger, debug bool) {
+	runner := newRunner(cfg, log, debug)
 
 	log.Info("running full integrity check with data read")
 	result, err := runner.Check(ctx, 100) // full read
@@ -138,8 +146,8 @@ func runCheck(ctx context.Context, cfg *config.Config, log *logger.Logger) {
 	log.Info("integrity check passed — all data verified")
 }
 
-func runStatus(ctx context.Context, cfg *config.Config, log *logger.Logger) {
-	runner := restic.NewRunner(cfg, log)
+func runStatus(ctx context.Context, cfg *config.Config, log *logger.Logger, debug bool) {
+	runner := newRunner(cfg, log, debug)
 
 	fmt.Println("=== Repository Snapshots ===")
 	result, err := runner.Snapshots(ctx)
@@ -202,6 +210,7 @@ Commands:
 
 Flags:
   --config     Path to config JSON file (default: restic-sentry.json next to binary)
+  --debug      Print full restic commands with credentials visible (for manual testing)
 
 Examples:
   restic-sentry install-restic                     # download restic

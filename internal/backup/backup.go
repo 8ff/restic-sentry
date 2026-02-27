@@ -29,6 +29,10 @@ func NewOrchestrator(cfg *config.Config, log *logger.Logger) *Orchestrator {
 	}
 }
 
+func (o *Orchestrator) SetDebug(debug bool) {
+	o.runner.Debug = debug
+}
+
 // Run executes the full backup pipeline:
 // preflight -> unlock -> init -> backup (with retry) -> check -> forget -> notify
 func (o *Orchestrator) Run(ctx context.Context) error {
