@@ -110,8 +110,8 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 
 	// Notify
 	if backupResult.ExitCode == restic.ExitPartial {
-		skipped := extractErrors(backupResult.Stderr, 20)
-		extra := fmt.Sprintf("*%d files skipped:*\n```\n%s\n```", countErrors(backupResult.Stderr), skipped)
+		total, summary := summarizeErrors(backupResult.Stderr)
+		extra := fmt.Sprintf("*%d files skipped:*\n```\n%s\n```", total, summary)
 		o.notifyWarning("Backup Completed with Warnings",
 			formatSummary(backupResult, duration, extra))
 	} else {
@@ -229,35 +229,49 @@ func formatSummary(result *restic.Result, duration time.Duration, extra string) 
 	return sb.String()
 }
 
-// extractErrors pulls error/warning lines from restic stderr output.
-// Each line includes the file path and reason (e.g. "Access is denied", "locked").
-// Returns up to maxLines lines to keep Slack messages reasonable.
-func extractErrors(stderr string, maxLines int) string {
-	var errors []string
+// summarizeErrors groups error lines by reason and returns a total count
+// plus a compact summary like "38x Access is denied\n3x The process cannot access the file".
+func summarizeErrors(stderr string) (int, string) {
+	reasons := make(map[string]int)
+	total := 0
 	for _, line := range strings.Split(stderr, "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "error:") || strings.HasPrefix(line, "warning:") {
-			errors = append(errors, line)
+		if !strings.HasPrefix(line, "error:") && !strings.HasPrefix(line, "warning:") {
+			continue
+		}
+		total++
+		// Extract reason after the last colon, e.g.:
+		// "error: open C:\pagefile.sys: Access is denied." -> "Access is denied."
+		if idx := strings.LastIndex(line, ": "); idx != -1 {
+			reason := strings.TrimSpace(line[idx+2:])
+			reasons[reason]++
+		} else {
+			reasons["unknown"]++
 		}
 	}
-	total := len(errors)
-	if total > maxLines {
-		errors = errors[:maxLines]
-		errors = append(errors, fmt.Sprintf("... and %d more", total-maxLines))
-	}
-	return strings.Join(errors, "\n")
-}
 
-// countErrors returns the total number of error/warning lines in restic stderr.
-func countErrors(stderr string) int {
-	count := 0
-	for _, line := range strings.Split(stderr, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "error:") || strings.HasPrefix(line, "warning:") {
-			count++
+	// Sort by count descending
+	type entry struct {
+		reason string
+		count  int
+	}
+	var entries []entry
+	for r, c := range reasons {
+		entries = append(entries, entry{r, c})
+	}
+	for i := 0; i < len(entries); i++ {
+		for j := i + 1; j < len(entries); j++ {
+			if entries[j].count > entries[i].count {
+				entries[i], entries[j] = entries[j], entries[i]
+			}
 		}
 	}
-	return count
+
+	var lines []string
+	for _, e := range entries {
+		lines = append(lines, fmt.Sprintf("%dx %s", e.count, e.reason))
+	}
+	return total, strings.Join(lines, "\n")
 }
 
 func truncate(s string, maxLen int) string {
