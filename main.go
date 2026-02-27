@@ -10,6 +10,7 @@ import (
 
 	"github.com/8ff/restic-sentry/internal/backup"
 	"github.com/8ff/restic-sentry/internal/config"
+	"github.com/8ff/restic-sentry/internal/install"
 	"github.com/8ff/restic-sentry/internal/lockfile"
 	"github.com/8ff/restic-sentry/internal/logger"
 	"github.com/8ff/restic-sentry/internal/restic"
@@ -45,6 +46,12 @@ func main() {
 		}
 		fmt.Printf("Example config written to %s\n", path)
 		fmt.Println("Edit this file with your S3 credentials, restic password, backup paths, and Slack webhook URL.")
+		return
+	case "install-restic":
+		if _, err := install.InstallRestic(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -182,8 +189,9 @@ Commands:
   status       Show snapshots, repo stats, and scheduler status
   install      Register in Windows Task Scheduler (run as admin)
   uninstall    Remove from Windows Task Scheduler
-  init-config  Generate an example config file
-  version      Print version
+  init-config     Generate an example config file
+  install-restic  Download and install latest restic to C:\restic
+  version         Print version
 
 Flags:
   --config     Path to config JSON file (default: restic-sentry.json next to binary)

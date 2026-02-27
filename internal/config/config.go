@@ -77,7 +77,7 @@ func Load(path string) (*Config, error) {
 
 func (c *Config) applyDefaults() {
 	if c.ResticBinary == "" {
-		c.ResticBinary = "restic"
+		c.ResticBinary = `C:\restic\restic.exe`
 	}
 	if c.Retry.MaxAttempts == 0 {
 		c.Retry.MaxAttempts = 3
@@ -171,6 +171,7 @@ func WriteExample(path string) error {
 			SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 			Region:    "us-east-1",
 		},
+		ResticBinary:          `C:\restic\restic.exe`,
 		ResticPassword:        "change-me-to-a-strong-password",
 		Paths:                 []string{`C:\Users\Me\Documents\Financial`},
 		Excludes:              []string{"*.tmp", "~$*"},
