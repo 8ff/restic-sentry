@@ -65,7 +65,7 @@ func (r *Runner) formatEnv(redact bool) string {
 			val = "***"
 		}
 		if runtime.GOOS == "windows" {
-			parts = append(parts, fmt.Sprintf("set %s=%s", key, val))
+			parts = append(parts, fmt.Sprintf("set \"%s=%s\"", key, val))
 		} else {
 			parts = append(parts, fmt.Sprintf("%s=%s", key, val))
 		}
@@ -107,7 +107,7 @@ func (r *Runner) run(ctx context.Context, args ...string) (*Result, error) {
 	envStr := r.formatEnv(!r.Debug)
 	var fullCmd string
 	if runtime.GOOS == "windows" {
-		fullCmd = fmt.Sprintf("%s; %s %s", envStr, r.cfg.ResticBinary, strings.Join(args, " "))
+		fullCmd = fmt.Sprintf("%s && %s %s", envStr, r.cfg.ResticBinary, strings.Join(args, " "))
 	} else {
 		fullCmd = fmt.Sprintf("%s %s %s", envStr, r.cfg.ResticBinary, strings.Join(args, " "))
 	}
